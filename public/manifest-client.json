@@ -1,0 +1,17 @@
+{
+  "name": "Mensajería - Mi Cuenta",
+  "short_name": "Mi Cuenta",
+  "description": "Mensajería con tu cuenta: cargas, retiros y consultas",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F4F1",
+  "theme_color": "#1F7A5C",
+  "icons": [
+    { "src": "/icons/client-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/client-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/client-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/client-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

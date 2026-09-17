@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de administrador</title>
+<link rel="manifest" href="/manifest-admin.json">
+<meta name="theme-color" content="#3B5BA6">
+<link rel="apple-touch-icon" href="/icons/admin-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Admin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#12211E;--ink-soft:#3C4A47;--paper:#F2F4F1;--card:#FFFFFF;--line:#D7DCD3;--money-soft:#E4F1EB;--money:#1F7A5C;--admin:#3B5BA6;--admin-soft:#E7ECF7;--warn:#C4562B;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;height:100vh;}
+
+  .login{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;}
+  .login-box{width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px;}
+  .login h1{font-size:19px;margin:0;}
+  .login p{font-size:13px;color:var(--ink-soft);margin:0 0 6px;}
+  .login input{border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:14px;background:var(--card);}
+  .login button{border:none;background:var(--admin);color:#fff;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .err{font-size:12px;color:var(--warn);min-height:14px;}
+
+  .app{display:none;height:100vh;grid-template-columns:280px 1fr;}
+  .app.show{display:grid;}
+  .sidebar{border-right:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;overflow:hidden;}
+  .sidebar-head{padding:16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .sidebar-head h2{font-size:15px;margin:0;}
+  .logout{background:none;border:none;font-size:11px;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+  .conv-list{flex:1;overflow:auto;}
+  .conv-item{padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer;position:relative;display:flex;gap:10px;align-items:center;}
+  .conv-item.active{background:var(--admin-soft);}
+  .conv-item .cav{width:32px;height:32px;border-radius:50%;background:var(--money-soft);color:var(--money);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;}
+  .conv-item .meta{min-width:0;}
+  .conv-item .cname{font-size:13px;font-weight:600;}
+  .conv-item .clast{font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;}
+  .conv-item .badge{margin-left:auto;background:var(--warn);color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+
+  .thread{display:flex;flex-direction:column;overflow:hidden;}
+  .thread-head{padding:16px 20px;border-bottom:1px solid var(--line);}
+  .thread-head .name{font-size:15px;font-weight:600;}
+  .thread-head .sub{font-size:11.5px;color:var(--ink-soft);}
+  .chat{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:8px;}
+  .bubble{max-width:60%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.4;white-space:pre-wrap;}
+  .bubble.mine{align-self:flex-end;background:var(--admin);color:#fff;border-bottom-right-radius:4px;}
+  .bubble.theirs{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px;}
+  .bubble .time{display:block;font-size:10px;opacity:.65;margin-top:3px;}
+  .empty{margin:auto;text-align:center;font-size:12.5px;color:var(--ink-soft);}
+  .placeholder{margin:auto;text-align:center;font-size:13px;color:var(--ink-soft);}
+
+  .composer{border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:8px;align-items:flex-end;}
+  .composer input[type=text],.composer textarea{flex:1;border:1px solid var(--line);border-radius:16px;padding:11px 16px;font-family:inherit;font-size:13.5px;background:var(--paper);resize:none;max-height:90px;line-height:1.4;}
+  .composer button{border:none;background:var(--admin);color:#fff;width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;flex-shrink:0;}
+  .composer button.clip{background:none;color:var(--ink-soft);font-size:19px;width:32px;height:32px;}
+  .preview{border-top:1px solid var(--line);padding:8px 16px;display:flex;align-items:center;gap:8px;background:var(--card);font-size:12px;color:var(--ink-soft);}
+  .preview img{width:34px;height:34px;object-fit:cover;border-radius:6px;}
+  .preview .pname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .preview .pcancel{cursor:pointer;color:var(--warn);font-weight:600;background:none;border:none;font-family:inherit;font-size:12px;}
+  .bubble img.att{max-width:100%;border-radius:10px;display:block;margin-bottom:4px;}
+  .bubble a.filechip{display:flex;align-items:center;gap:6px;text-decoration:none;color:inherit;background:rgba(255,255,255,.15);border-radius:8px;padding:6px 8px;margin-bottom:4px;font-size:12.5px;}
+  .bubble.theirs a.filechip{background:var(--paper);}
+
+  .templates{border-top:1px solid var(--line);padding:10px 16px 0;background:var(--card);}
+  .templates .lead{font-size:11px;color:var(--ink-soft);margin:0 0 6px;}
+  .tpl-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .tpl-chip{border:1px solid var(--line);background:var(--paper);font-size:11.5px;padding:6px 10px;border-radius:8px;cursor:pointer;color:var(--ink-soft);font-family:inherit;}
+  .tpl-chip.suggested{border-color:var(--admin);color:var(--admin);background:var(--admin-soft);font-weight:500;}
+
+  @media (max-width:760px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
+    .sidebar{border-right:none;border-bottom:1px solid var(--line);max-height:none;}
+    .conv-list{display:flex;overflow-x:auto;flex:none;}
+    .conv-item{flex:0 0 auto;min-width:170px;border-bottom:none;border-right:1px solid var(--line);}
+    .thread{min-height:0;}
+  }
+</style>
+</head>
+<body>
+
+<div class="login" id="loginView">
+  <div class="login-box">
+    <h1>Panel de administrador</h1>
+    <p>Ingresá con tu usuario y clave de admin.</p>
+    <input type="text" id="user" placeholder="Usuario" autocomplete="username">
+    <input type="password" id="pass" placeholder="Clave" autocomplete="current-password">
+    <p class="err" id="err"></p>
+    <button id="loginBtn">Ingresar</button>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <div class="sidebar">
+    <div class="sidebar-head">
+      <h2>Conversaciones</h2>
+      <button class="logout" id="logoutBtn">Salir</button>
+    </div>
+    <div class="conv-list" id="convList"></div>
+  </div>
+  <div class="thread" id="threadArea">
+    <div class="placeholder">Elegí una conversación de la izquierda.</div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+let token = null;
+let socket = null;
+let conversations = [];
+let activeId = null;
+let selectedFile = null;
+
+const TEMPLATES = {
+  'Quiero cargar': {
+    label: 'Cargar saldo',
+    text: 'Para cargar tu cuenta transferí a:\nAlias: TUTIENDA.PAGOS\nCBU: 0000000000000000000000\nCuando lo hagas mandanos el comprobante y te lo acreditamos.'
+  },
+  'Quiero hacer un retiro': {
+    label: 'Retiro',
+    text: 'Para procesar tu retiro necesitamos el monto y el CBU/alias donde lo enviamos. El tiempo estimado es de hasta 24hs hábiles.'
+  },
+  'Me pasás los datos de mi cuenta': {
+    label: 'Datos de cuenta',
+    text: 'Tus datos de cuenta:\nUsuario: (completar)\nEstado: activa\nCualquier duda, contanos.'
+  },
+  'Acceder a la plataforma': {
+    label: 'Acceso a la plataforma',
+    text: 'Accedé a la plataforma desde acá: https://tutienda.example.com/mi-cuenta\nSi tenés problemas para entrar avisanos y te ayudamos.'
+  }
+};
+
+function fmtTime(iso){ return new Date(iso).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); }
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function authHeaders(){ return { Authorization: 'Bearer ' + token }; }
+
+document.getElementById('loginBtn').addEventListener('click', async ()=>{
+  const username = document.getElementById('user').value.trim();
+  const password = document.getElementById('pass').value.trim();
+  const errEl = document.getElementById('err');
+  errEl.textContent = '';
+  if(!username || !password){ errEl.textContent = 'Completá usuario y clave.'; return; }
+
+  try{
+    const res = await fetch('/api/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if(!res.ok){ errEl.textContent = data.error || 'Error al ingresar'; return; }
+    if(data.user.role !== 'admin'){ errEl.textContent = 'Esta cuenta no es de administrador.'; return; }
+    token = data.token;
+    startApp();
+  }catch(e){
+    errEl.textContent = 'No se pudo conectar con el servidor.';
+  }
+});
+
+async function startApp(){
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('app').classList.add('show');
+
+  await loadConversations();
+
+  socket = io({ auth: { token } });
+  socket.on('new_message', async (m)=>{
+    await loadConversations();
+    if(m.conversation_user_id === activeId){
+      appendMessage(m);
+      markRead(activeId);
+      if(m.sender_role === 'client' && TEMPLATES[m.text]){
+        document.getElementById('msgInput').value = TEMPLATES[m.text].text;
+        const row = document.getElementById('tplRow');
+        if(row) row.querySelectorAll('.tpl-chip').forEach(c => c.classList.toggle('suggested', c.dataset.key === m.text));
+      }
+    }
+  });
+}
+
+async function loadConversations(){
+  const res = await fetch('/api/conversations', { headers: authHeaders() });
+  conversations = await res.json();
+  renderConvList();
+}
+
+function renderConvList(){
+  const list = document.getElementById('convList');
+  list.innerHTML = conversations.map(c => `
+    <div class="conv-item ${c.id===activeId?'active':''}" data-id="${c.id}">
+      <div class="cav">${(c.display_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+      <div class="meta">
+        <div class="cname">${escapeHtml(c.display_name)}</div>
+        <div class="clast">${c.last_message ? escapeHtml(c.last_message.text) : 'Sin mensajes'}</div>
+      </div>
+      ${c.unread > 0 ? `<div class="badge">${c.unread}</div>` : ''}
+    </div>
+  `).join('');
+  list.querySelectorAll('.conv-item').forEach(item=>{
+    item.addEventListener('click', ()=> openConversation(item.dataset.id));
+  });
+}
+
+async function openConversation(id){
+  activeId = id;
+  renderConvList();
+  const conv = conversations.find(c => c.id === id);
+  document.getElementById('threadArea').innerHTML = `
+    <div class="thread-head">
+      <div class="name">${escapeHtml(conv.display_name)}</div>
+      <div class="sub">@${escapeHtml(conv.username)}</div>
+    </div>
+    <div class="chat" id="chatScroll"></div>
+    <div class="templates" id="templatesArea"></div>
+    <div class="preview" id="filePreview" style="display:none;"></div>
+    <div class="composer">
+      <button id="clipBtn" class="clip" type="button" title="Adjuntar archivo">📎</button>
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" style="display:none;">
+      <textarea id="msgInput" rows="1" placeholder="Responder... (Shift+Enter para salto de línea)"></textarea>
+      <button id="sendBtn">➤</button>
+    </div>
+  `;
+
+  const res = await fetch('/api/messages/' + id, { headers: authHeaders() });
+  const history = await res.json();
+  const wrap = document.getElementById('chatScroll');
+  wrap.innerHTML = history.length ? '' : '<div class="empty">Sin mensajes con este usuario todavía.</div>';
+  history.forEach(m => appendMessage(m, false));
+  wrap.scrollTop = wrap.scrollHeight;
+
+  document.getElementById('sendBtn').addEventListener('click', sendMsg);
+  document.getElementById('msgInput').addEventListener('keydown', e=>{
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
+  });
+  document.getElementById('clipBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
+  document.getElementById('fileInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    if(file.size > 8 * 1024 * 1024){ alert('El archivo no puede superar 8 MB.'); e.target.value=''; return; }
+    selectedFile = file;
+    const prev = document.getElementById('filePreview');
+    prev.style.display = 'flex';
+    prev.innerHTML = (file.type.startsWith('image/') ? `<img src="${URL.createObjectURL(file)}">` : '📄') +
+      `<span class="pname">${escapeHtml(file.name)}</span><button class="pcancel" id="pcancel">Quitar</button>`;
+    document.getElementById('pcancel').addEventListener('click', ()=>{
+      selectedFile = null;
+      document.getElementById('fileInput').value = '';
+      prev.style.display = 'none';
+    });
+  });
+
+  renderTemplates(history);
+  markRead(id);
+  await loadConversations();
+}
+
+function renderTemplates(history){
+  // sugiere una plantilla según el último mensaje del cliente que coincida con una opción rápida
+  let suggestedKey = null;
+  for(let i = history.length - 1; i >= 0; i--){
+    const m = history[i];
+    if(m.sender_role === 'client' && TEMPLATES[m.text]){ suggestedKey = m.text; break; }
+  }
+
+  const area = document.getElementById('templatesArea');
+  area.innerHTML = `
+    <div class="lead">Plantillas — se cargan solas, las podés editar antes de enviar</div>
+    <div class="tpl-row" id="tplRow"></div>
+  `;
+  const row = document.getElementById('tplRow');
+  row.innerHTML = Object.entries(TEMPLATES).map(([key, t]) => `
+    <button class="tpl-chip ${key===suggestedKey?'suggested':''}" data-key="${escapeHtml(key)}">${escapeHtml(t.label)}</button>
+  `).join('');
+  row.querySelectorAll('.tpl-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      const input = document.getElementById('msgInput');
+      input.value = TEMPLATES[chip.dataset.key].text;
+      input.focus();
+    });
+  });
+
+  if(suggestedKey){
+    document.getElementById('msgInput').value = TEMPLATES[suggestedKey].text;
+  }
+}
+
+function bubbleAttachmentHtml(m){
+  if(!m.file_url) return '';
+  if((m.file_mime||'').startsWith('image/')){
+    return `<a href="${m.file_url}" target="_blank"><img class="att" src="${m.file_url}" alt="${escapeHtml(m.file_name||'imagen')}"></a>`;
+  }
+  return `<a class="filechip" href="${m.file_url}" target="_blank">📄 ${escapeHtml(m.file_name||'archivo')}</a>`;
+}
+
+function appendMessage(m, scroll = true){
+  const wrap = document.getElementById('chatScroll');
+  if(!wrap) return;
+  const empty = wrap.querySelector('.empty');
+  if(empty) empty.remove();
+  const div = document.createElement('div');
+  div.className = 'bubble ' + (m.sender_role === 'admin' ? 'mine' : 'theirs');
+  const textHtml = m.text ? escapeHtml(m.text) : '';
+  div.innerHTML = bubbleAttachmentHtml(m) + textHtml + '<span class="time">' + fmtTime(m.created_at) + '</span>';
+  wrap.appendChild(div);
+  if(scroll) wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function markRead(id){
+  // el GET /api/messages/:userId ya marca como leído en el servidor
+}
+
+async function uploadSelectedFile(){
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: fd
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error || 'No se pudo subir el archivo');
+  return data;
+}
+
+async function sendMsg(){
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if((!text && !selectedFile) || !socket || !activeId) return;
+
+  let attachment = null;
+  const sendBtn = document.getElementById('sendBtn');
+  try{
+    if(selectedFile){
+      sendBtn.disabled = true; sendBtn.textContent = '…';
+      attachment = await uploadSelectedFile();
+    }
+  }catch(err){
+    alert(err.message);
+    sendBtn.disabled = false; sendBtn.textContent = '➤';
+    return;
+  }
+
+  socket.emit('send_message', { text, conversationUserId: activeId, attachment });
+  input.value = '';
+  selectedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('filePreview').style.display = 'none';
+  sendBtn.disabled = false; sendBtn.textContent = '➤';
+}
+
+document.getElementById('logoutBtn').addEventListener('click', ()=>{
+  if(socket) socket.disconnect();
+  token = null; activeId = null;
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('loginView').style.display = 'flex';
+  document.getElementById('pass').value = '';
+});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
