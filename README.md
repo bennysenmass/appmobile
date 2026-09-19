@@ -49,6 +49,7 @@ Podés abrir las dos páginas en pestañas distintas y probar a chatear entre el
    - **Start Command:** `npm start`
 5. En la sección **Environment Variables**, agregá:
    - `JWT_SECRET` = un texto largo y aleatorio (esto firma las sesiones — no lo compartas)
+   - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` = copiá los valores del archivo `.env.example` (son las claves que hacen funcionar las notificaciones push)
 6. Creá el servicio. Cuando termine de desplegar te da una URL tipo `https://tu-app.onrender.com`.
 7. Entrá una sola vez a esa URL + `/index.html`, y ejecutá el seed **desde la consola de Render** (pestaña "Shell"):
    ```bash
@@ -64,10 +65,27 @@ El plan free "duerme" el servidor tras un rato sin uso, y tarda unos segundos en
 despertar con el primer mensaje. Para una app en producción real conviene pasar
 a un plan pago cuando ya tengas usuarios reales.
 
+## Notificaciones push
+
+Cuando el cliente o el admin entran a su cuenta, el navegador les pide permiso para
+mandar notificaciones. Si lo aceptan, van a recibir un aviso (con sonido e ícono en la
+barra de notificaciones) apenas llega un mensaje nuevo — aunque tengan la app cerrada
+o el celular bloqueado.
+
+- **Android (Chrome, Samsung Internet, etc.):** funciona apenas se acepta el permiso,
+  no hace falta instalar la app.
+- **iPhone (Safari):** Apple solo permite las notificaciones push si la app está
+  instalada en la pantalla de inicio (ver la sección de instalación más abajo) y con
+  iOS 16.4 o más nuevo. Desde una pestaña normal de Safari no van a funcionar.
+
+Si en algún momento se pierden o cambian las claves VAPID, simplemente generá unas
+nuevas con `npx web-push generate-vapid-keys` y actualizá las variables de entorno.
+
 ## Qué falta para que sea una app de verdad (próximos pasos)
 
-- [ ] Convertir esto en app instalable en el celular (PWA) o nativa
-- [ ] Notificaciones push reales (que avisen aunque la app esté cerrada)
+- [x] Convertir esto en app instalable en el celular (PWA)
+- [x] Notificaciones push reales (que avisen aunque la app esté cerrada)
 - [ ] Pantalla de admin para crear/gestionar usuarios (hoy se hace con `seed.js`)
-- [ ] Menú de opciones rápidas del cliente ("quiero cargar", etc.) + plantillas admin
-- [ ] Subir imágenes/comprobantes en el chat
+- [x] Menú de opciones rápidas del cliente ("quiero cargar", etc.) + plantillas admin
+- [x] Subir imágenes/comprobantes en el chat
+- [ ] Base de datos permanente (hoy se resetea en cada redeploy en el plan gratuito)

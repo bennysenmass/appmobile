@@ -106,6 +106,7 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="/push-client.js"></script>
 <script>
 let token = null;
 let socket = null;
@@ -163,6 +164,7 @@ async function startApp(){
   document.getElementById('app').classList.add('show');
 
   await loadConversations();
+  setupPushNotifications(token);
 
   socket = io({ auth: { token } });
   socket.on('new_message', async (m)=>{

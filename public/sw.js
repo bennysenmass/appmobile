@@ -48,3 +48,39 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// ---------- notificaciones push ----------
+self.addEventListener('push', (event) => {
+  let data = { title: 'Nuevo mensaje', body: '', url: '/' };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    if (event.data) data.body = event.data.text();
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/icons/client-192.png',
+    badge: '/icons/badge-96.png',
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'mensaje',
+    renotify: true,
+    data: { url: data.url || '/' }
+  };
+
+  event.waitUntil(self.registration.showNotification(data.title || 'Nuevo mensaje', options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(targetUrl) && 'focus' in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })
+  );
+});

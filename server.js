@@ -9,6 +9,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const multer = require('multer');
 const { randomUUID } = require('crypto');
+const webpush = require('web-push');
 
 const db = require('./db');
 
@@ -32,6 +33,43 @@ const db = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cambia-este-secreto-en-produccion';
 const PORT = process.env.PORT || 3000;
+
+// ---------- notificaciones push (Web Push / VAPID) ----------
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:soporte@example.com';
+const pushEnabled = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+
+if (pushEnabled) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+} else {
+  console.log('Aviso: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY no configuradas — las notificaciones push están desactivadas.');
+}
+
+function sendPushToUser(userId, payload) {
+  if (!pushEnabled) return;
+  const subs = db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId);
+  const json = JSON.stringify(payload);
+  for (const sub of subs) {
+    const pushSubscription = {
+      endpoint: sub.endpoint,
+      keys: { p256dh: sub.p256dh, auth: sub.auth }
+    };
+    webpush.sendNotification(pushSubscription, json).catch((err) => {
+      // Si la suscripción ya no es válida (desinstaló la app, cambió de navegador, etc.), la borramos.
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(sub.id);
+      } else {
+        console.error('Error enviando push:', err.statusCode || err.message);
+      }
+    });
+  }
+}
+
+function sendPushToAllAdmins(payload) {
+  const admins = db.prepare(`SELECT id FROM users WHERE role = 'admin'`).all();
+  for (const a of admins) sendPushToUser(a.id, payload);
+}
 
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
@@ -121,6 +159,30 @@ app.post('/api/upload', authMiddleware, (req, res) => {
       file_mime: req.file.mimetype
     });
   });
+});
+
+// ---------- notificaciones push: clave pública y suscripción ----------
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY, enabled: pushEnabled });
+});
+
+app.post('/api/push/subscribe', authMiddleware, (req, res) => {
+  const sub = req.body || {};
+  if (!sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) {
+    return res.status(400).json({ error: 'Suscripción inválida' });
+  }
+  db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth
+  `).run(req.user.id, sub.endpoint, sub.keys.p256dh, sub.keys.auth);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unsubscribe', authMiddleware, (req, res) => {
+  const { endpoint } = req.body || {};
+  if (endpoint) db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
+  res.json({ ok: true });
 });
 
 // ---------- conversations (admin) ----------
@@ -227,6 +289,25 @@ io.on('connection', (socket) => {
 
     io.to(`user:${convId}`).emit('new_message', payload);
     io.to('admins').emit('new_message', payload);
+
+    // ---- notificación push al destinatario ----
+    const notifBody = cleanText || (hasAttachment ? '📎 Te mandaron un archivo' : '');
+    if (role === 'client') {
+      const client = db.prepare('SELECT display_name FROM users WHERE id = ?').get(id);
+      sendPushToAllAdmins({
+        title: client ? client.display_name : 'Nuevo mensaje',
+        body: notifBody,
+        url: '/admin.html',
+        tag: `conv-${convId}`
+      });
+    } else {
+      sendPushToUser(convId, {
+        title: 'Atención',
+        body: notifBody,
+        url: '/index.html',
+        tag: `conv-${convId}`
+      });
+    }
   });
 });
 
