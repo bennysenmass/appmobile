@@ -153,6 +153,7 @@ document.getElementById('loginBtn').addEventListener('click', async ()=>{
     if(!res.ok){ errEl.textContent = data.error || 'Error al ingresar'; return; }
     if(data.user.role !== 'admin'){ errEl.textContent = 'Esta cuenta no es de administrador.'; return; }
     token = data.token;
+    try{ localStorage.setItem('mensajeria_admin_token', token); }catch{}
     startApp();
   }catch(e){
     errEl.textContent = 'No se pudo conectar con el servidor.';
@@ -354,10 +355,28 @@ async function sendMsg(){
 document.getElementById('logoutBtn').addEventListener('click', ()=>{
   if(socket) socket.disconnect();
   token = null; activeId = null;
+  try{ localStorage.removeItem('mensajeria_admin_token'); }catch{}
   document.getElementById('app').classList.remove('show');
   document.getElementById('loginView').style.display = 'flex';
   document.getElementById('pass').value = '';
 });
+
+// ---- retomar sesión guardada, si hay una válida ----
+(async function resumeSession(){
+  let saved = null;
+  try{ saved = localStorage.getItem('mensajeria_admin_token'); }catch{}
+  if(!saved) return;
+
+  token = saved;
+  try{
+    const res = await fetch('/api/conversations', { headers:{ Authorization: 'Bearer ' + token } });
+    if(!res.ok) throw new Error('token vencido');
+    await startApp();
+  }catch{
+    token = null;
+    try{ localStorage.removeItem('mensajeria_admin_token'); }catch{}
+  }
+})();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{

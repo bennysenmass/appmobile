@@ -128,6 +128,7 @@ document.getElementById('loginBtn').addEventListener('click', async ()=>{
     const data = await res.json();
     if(!res.ok){ errEl.textContent = data.error || 'Error al ingresar'; return; }
     token = data.token;
+    try{ localStorage.setItem('mensajeria_token', token); }catch{}
     startChat();
   }catch(e){
     errEl.textContent = 'No se pudo conectar con el servidor.';
@@ -265,10 +266,28 @@ async function sendMsg(){
 document.getElementById('logoutBtn').addEventListener('click', ()=>{
   if(socket) socket.disconnect();
   token = null;
+  try{ localStorage.removeItem('mensajeria_token'); }catch{}
   document.getElementById('chatWrap').style.display = 'none';
   document.getElementById('loginView').style.display = 'flex';
   document.getElementById('pass').value = '';
 });
+
+// ---- retomar sesión guardada, si hay una válida ----
+(async function resumeSession(){
+  let saved = null;
+  try{ saved = localStorage.getItem('mensajeria_token'); }catch{}
+  if(!saved) return;
+
+  token = saved;
+  try{
+    const res = await fetch('/api/messages/me', { headers:{ Authorization: 'Bearer ' + token } });
+    if(!res.ok) throw new Error('token vencido');
+    await startChat();
+  }catch{
+    token = null;
+    try{ localStorage.removeItem('mensajeria_token'); }catch{}
+  }
+})();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
