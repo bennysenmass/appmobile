@@ -230,6 +230,7 @@ async function startApp(){
   socket = io({ auth: { token } });
   socket.on('new_message', async (m)=>{
     await loadConversations();
+    if(m.sender_role === 'client') playNotificationChime();
     if(m.conversation_user_id === activeId){
       appendMessage(m);
       markRead(activeId);

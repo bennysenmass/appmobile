@@ -52,3 +52,18 @@ function urlBase64ToUint8Array(base64String) {
   for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
 }
+
+// Suena y vibra desde la propia app cuando llega un mensaje con la app abierta en primer plano.
+// (Las notificaciones del sistema no suenan en ese caso porque el celular entiende que ya la estás mirando.)
+let _chimeAudio = null;
+function playNotificationChime() {
+  try {
+    if (document.visibilityState !== 'visible') return; // en segundo plano, ya se ocupa la notificación del sistema
+    if (!_chimeAudio) _chimeAudio = new Audio('/chime.wav');
+    _chimeAudio.currentTime = 0;
+    _chimeAudio.play().catch(() => {}); // si el navegador bloquea el autoplay, no rompemos nada
+  } catch {}
+  try {
+    if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+  } catch {}
+}

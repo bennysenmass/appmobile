@@ -147,6 +147,7 @@ async function startChat(){
   socket = io({ auth: { token } });
   socket.on('new_message', (m)=>{
     appendMessage(m);
+    if(m.sender_role === 'admin') playNotificationChime();
   });
 
   setupPushNotifications(token);
@@ -318,15 +319,18 @@ if('serviceWorker' in navigator){
 
   const ua = window.navigator.userAgent.toLowerCase();
   const isIos = /iphone|ipad|ipod/.test(ua);
+  const isSamsung = /samsungbrowser/.test(ua);
 
   if(isIos){
     textEl.textContent = 'Para instalar la app: tocá compartir 􀈂 y elegí "Agregar a pantalla de inicio"';
     installBtn.style.display = 'none';
     banner.style.display = 'flex';
   }else{
+    let promptCaptured = false;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
+      promptCaptured = true;
       banner.style.display = 'flex';
     });
     installBtn.addEventListener('click', async ()=>{
@@ -337,6 +341,17 @@ if('serviceWorker' in navigator){
         deferredPrompt = null;
       }
     });
+
+    // Samsung Internet no siempre dispara el aviso automático: si no aparece solo
+    // en unos segundos, mostramos las instrucciones manuales en su lugar.
+    if(isSamsung){
+      setTimeout(()=>{
+        if(promptCaptured || isStandalone() || wasDismissed()) return;
+        textEl.textContent = 'Para instalar la app: tocá el menú ☰ y elegí "Agregar página a" → "Pantalla de Inicio"';
+        installBtn.style.display = 'none';
+        banner.style.display = 'flex';
+      }, 2500);
+    }
   }
 
   dismissBtn.addEventListener('click', dismiss);
