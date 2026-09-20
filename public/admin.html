@@ -70,6 +70,35 @@
   .tpl-chip{border:1px solid var(--line);background:var(--paper);font-size:11.5px;padding:6px 10px;border-radius:8px;cursor:pointer;color:var(--ink-soft);font-family:inherit;}
   .tpl-chip.suggested{border-color:var(--admin);color:var(--admin);background:var(--admin-soft);font-weight:500;}
 
+  .head-actions{display:flex;align-items:center;gap:10px;}
+  .head-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);font-family:inherit;font-size:11.5px;font-weight:500;padding:6px 10px;border-radius:8px;cursor:pointer;}
+  .head-btn:hover{border-color:var(--admin);color:var(--admin);}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(18,33,30,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal-card{background:var(--card);border-radius:16px;width:100%;max-width:440px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25);}
+  .modal-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .modal-head h2{font-size:16px;margin:0;}
+  .modal-close{background:none;border:none;font-size:16px;color:var(--ink-soft);cursor:pointer;}
+  .modal-body{padding:16px 18px;overflow:auto;}
+
+  .user-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .user-row .role-badge{font-size:10px;font-weight:700;padding:3px 7px;border-radius:999px;flex-shrink:0;}
+  .role-badge.admin{background:var(--admin-soft);color:var(--admin);}
+  .role-badge.client{background:var(--money-soft);color:var(--money);}
+  .user-row .u-info{flex:1;min-width:0;}
+  .user-row .u-name{font-size:13px;font-weight:600;}
+  .user-row .u-login{font-size:11px;color:var(--ink-soft);}
+  .user-row .u-actions{display:flex;gap:6px;flex-shrink:0;}
+  .small-btn{font-family:inherit;font-size:11px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);padding:6px 8px;border-radius:7px;cursor:pointer;}
+  .small-btn.danger{color:var(--warn);border-color:var(--warn);}
+  .small-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+  .new-user-box{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:8px;}
+  .new-user-box .lead{font-size:12px;font-weight:600;color:var(--ink);margin-bottom:2px;}
+  .new-user-box input,.new-user-box select{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-family:inherit;font-size:13px;background:var(--paper);}
+  .new-user-box button{border:none;background:var(--admin);color:#fff;padding:10px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .new-user-box .err{font-size:11.5px;color:var(--warn);margin:0;min-height:14px;}
+
   @media (max-width:760px){
     .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
     .sidebar{border-right:none;border-bottom:1px solid var(--line);max-height:none;}
@@ -96,7 +125,10 @@
   <div class="sidebar">
     <div class="sidebar-head">
       <h2>Conversaciones</h2>
-      <button class="logout" id="logoutBtn">Salir</button>
+      <div class="head-actions">
+        <button class="head-btn" id="manageUsersBtn">Usuarios</button>
+        <button class="logout" id="logoutBtn">Salir</button>
+      </div>
     </div>
     <div class="conv-list" id="convList"></div>
   </div>
@@ -105,14 +137,41 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="usersModal" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Usuarios</h2>
+      <button class="modal-close" id="closeUsersModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="usersList"></div>
+
+      <div class="new-user-box">
+        <div class="lead">Crear nuevo usuario</div>
+        <input type="text" id="newUsername" placeholder="Usuario (sin espacios, ej: juan)">
+        <input type="text" id="newDisplayName" placeholder="Nombre a mostrar (ej: Juan Pérez)">
+        <input type="password" id="newPassword" placeholder="Clave (mínimo 6 caracteres)">
+        <select id="newRole">
+          <option value="client">Cliente</option>
+          <option value="admin">Administrador</option>
+        </select>
+        <p class="err" id="newUserErr"></p>
+        <button id="createUserBtn">Crear usuario</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script src="/push-client.js"></script>
 <script>
+
 let token = null;
 let socket = null;
 let conversations = [];
 let activeId = null;
 let selectedFile = null;
+let currentUserId = null;
 
 const TEMPLATES = {
   'Quiero cargar': {
@@ -153,6 +212,7 @@ document.getElementById('loginBtn').addEventListener('click', async ()=>{
     if(!res.ok){ errEl.textContent = data.error || 'Error al ingresar'; return; }
     if(data.user.role !== 'admin'){ errEl.textContent = 'Esta cuenta no es de administrador.'; return; }
     token = data.token;
+    currentUserId = data.user.id;
     try{ localStorage.setItem('mensajeria_admin_token', token); }catch{}
     startApp();
   }catch(e){
@@ -369,8 +429,10 @@ document.getElementById('logoutBtn').addEventListener('click', ()=>{
 
   token = saved;
   try{
-    const res = await fetch('/api/conversations', { headers:{ Authorization: 'Bearer ' + token } });
-    if(!res.ok) throw new Error('token vencido');
+    const meRes = await fetch('/api/me', { headers:{ Authorization: 'Bearer ' + token } });
+    if(!meRes.ok) throw new Error('token vencido');
+    const me = await meRes.json();
+    currentUserId = me.id;
     await startApp();
   }catch{
     token = null;
@@ -383,6 +445,103 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/sw.js').catch(()=>{});
   });
 }
+
+// ---------- gestión de usuarios ----------
+const usersModal = document.getElementById('usersModal');
+
+document.getElementById('manageUsersBtn').addEventListener('click', async ()=>{
+  usersModal.style.display = 'flex';
+  await loadUsers();
+});
+document.getElementById('closeUsersModal').addEventListener('click', ()=>{
+  usersModal.style.display = 'none';
+});
+usersModal.addEventListener('click', (e)=>{
+  if(e.target === usersModal) usersModal.style.display = 'none';
+});
+
+async function loadUsers(){
+  const wrap = document.getElementById('usersList');
+  wrap.innerHTML = '<div class="placeholder" style="padding:10px 0;">Cargando...</div>';
+  try{
+    const res = await fetch('/api/users', { headers: authHeaders() });
+    const users = await res.json();
+    renderUsersList(users);
+  }catch{
+    wrap.innerHTML = '<div class="placeholder" style="padding:10px 0;">No se pudo cargar la lista.</div>';
+  }
+}
+
+function renderUsersList(users){
+  const wrap = document.getElementById('usersList');
+  wrap.innerHTML = users.map(u => `
+    <div class="user-row" data-id="${u.id}">
+      <span class="role-badge ${u.role}">${u.role === 'admin' ? 'Admin' : 'Cliente'}</span>
+      <div class="u-info">
+        <div class="u-name">${escapeHtml(u.display_name)}</div>
+        <div class="u-login">@${escapeHtml(u.username)}</div>
+      </div>
+      <div class="u-actions">
+        <button class="small-btn" data-action="pw" data-id="${u.id}">Cambiar clave</button>
+        <button class="small-btn danger" data-action="del" data-id="${u.id}" ${u.id === currentUserId ? 'disabled title="No podés eliminarte a vos mismo"' : ''}>Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+
+  wrap.querySelectorAll('[data-action="pw"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const newPass = prompt('Nueva clave para este usuario (mínimo 6 caracteres):');
+      if(newPass === null) return; // canceló
+      if(newPass.length < 6){ alert('La clave debe tener al menos 6 caracteres.'); return; }
+      const res = await fetch('/api/users/' + btn.dataset.id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ password: newPass })
+      });
+      const data = await res.json();
+      if(!res.ok){ alert(data.error || 'No se pudo cambiar la clave.'); return; }
+      alert('Clave actualizada.');
+    });
+  });
+
+  wrap.querySelectorAll('[data-action="del"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('¿Eliminar este usuario? Se borran también sus mensajes. No se puede deshacer.')) return;
+      const res = await fetch('/api/users/' + btn.dataset.id, { method: 'DELETE', headers: authHeaders() });
+      const data = await res.json();
+      if(!res.ok){ alert(data.error || 'No se pudo eliminar.'); return; }
+      await loadUsers();
+      await loadConversations();
+    });
+  });
+}
+
+document.getElementById('createUserBtn').addEventListener('click', async ()=>{
+  const username = document.getElementById('newUsername').value.trim();
+  const display_name = document.getElementById('newDisplayName').value.trim();
+  const password = document.getElementById('newPassword').value;
+  const role = document.getElementById('newRole').value;
+  const errEl = document.getElementById('newUserErr');
+  errEl.textContent = '';
+
+  if(!username || !display_name || !password){ errEl.textContent = 'Completá todos los campos.'; return; }
+  if(/\s/.test(username)){ errEl.textContent = 'El usuario no puede tener espacios.'; return; }
+  if(password.length < 6){ errEl.textContent = 'La clave debe tener al menos 6 caracteres.'; return; }
+
+  const res = await fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ username, display_name, password, role })
+  });
+  const data = await res.json();
+  if(!res.ok){ errEl.textContent = data.error || 'No se pudo crear el usuario.'; return; }
+
+  document.getElementById('newUsername').value = '';
+  document.getElementById('newDisplayName').value = '';
+  document.getElementById('newPassword').value = '';
+  await loadUsers();
+  await loadConversations();
+});
 </script>
 </body>
 </html>

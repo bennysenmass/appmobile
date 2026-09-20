@@ -185,6 +185,79 @@ app.post('/api/push/unsubscribe', authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- datos del usuario logueado ----------
+app.get('/api/me', authMiddleware, (req, res) => {
+  res.json({ id: req.user.id, username: req.user.username, role: req.user.role, display_name: req.user.display_name });
+});
+
+// ---------- gestión de usuarios (solo admin) ----------
+app.get('/api/users', authMiddleware, requireAdmin, (req, res) => {
+  const users = db.prepare(`
+    SELECT id, username, role, display_name, created_at FROM users
+    ORDER BY role DESC, display_name ASC
+  `).all();
+  res.json(users);
+});
+
+app.post('/api/users', authMiddleware, requireAdmin, (req, res) => {
+  const { username, password, display_name, role } = req.body || {};
+  if (!username || !password || !display_name || !role) {
+    return res.status(400).json({ error: 'Completá todos los campos' });
+  }
+  if (!['client', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'Rol inválido' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'La clave debe tener al menos 6 caracteres' });
+  }
+  const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username);
+  if (exists) return res.status(409).json({ error: 'Ese nombre de usuario ya existe' });
+
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO users (id, username, password_hash, role, display_name) VALUES (?, ?, ?, ?, ?)
+  `).run(id, username, bcrypt.hashSync(password, 10), role, display_name);
+
+  res.json({ id, username, role, display_name });
+});
+
+app.patch('/api/users/:id', authMiddleware, requireAdmin, (req, res) => {
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+  const { display_name, password } = req.body || {};
+  if (display_name) {
+    db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(display_name, req.params.id);
+  }
+  if (password) {
+    if (password.length < 6) return res.status(400).json({ error: 'La clave debe tener al menos 6 caracteres' });
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(password, 10), req.params.id);
+  }
+  res.json({ ok: true });
+});
+
+app.delete('/api/users/:id', authMiddleware, requireAdmin, (req, res) => {
+  if (req.params.id === req.user.id) {
+    return res.status(400).json({ error: 'No podés eliminar tu propia cuenta' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+  if (user.role === 'admin') {
+    const adminCount = db.prepare(`SELECT COUNT(*) as n FROM users WHERE role = 'admin'`).get().n;
+    if (adminCount <= 1) return res.status(400).json({ error: 'No podés eliminar el único administrador' });
+  }
+
+  const deleteUserAndData = db.transaction((userId) => {
+    db.prepare('DELETE FROM messages WHERE conversation_user_id = ?').run(userId);
+    db.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  });
+  deleteUserAndData(req.params.id);
+
+  res.json({ ok: true });
+});
+
 // ---------- conversations (admin) ----------
 app.get('/api/conversations', authMiddleware, requireAdmin, (req, res) => {
   const clients = db.prepare(`SELECT id, username, display_name FROM users WHERE role = 'client'`).all();
