@@ -10,6 +10,7 @@ const { Server } = require('socket.io');
 const multer = require('multer');
 const { randomUUID } = require('crypto');
 const webpush = require('web-push');
+const rateLimit = require('express-rate-limit');
 
 const db = require('./db');
 
@@ -95,14 +96,30 @@ const upload = multer({
   }
 });
 
+// ---------- CORS: solo se permiten los orígenes de la propia app ----------
+// Por defecto solo permite el dominio de Render de esta app. Si algún día se usa
+// un dominio propio además, agregalo separado por coma en la variable de entorno.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://mensajeria-app-9iqw.onrender.com')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // sin "origin" (apps nativas, curl, llamadas del propio servidor) → se permite
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Origen no permitido'));
+  }
+};
+
 const app = express();
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, { cors: { origin: allowedOrigins } });
 
 // ---------- helpers ----------
 function signToken(user) {
@@ -131,7 +148,17 @@ function requireAdmin(req, res, next) {
 }
 
 // ---------- auth ----------
-app.post('/api/login', (req, res) => {
+// Límite de intentos: si alguien prueba muchas combinaciones de usuario/clave
+// seguidas desde la misma IP, lo frenamos un rato en vez de dejarlo seguir probando.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10,                  // 10 intentos como máximo en ese lapso
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos de ingreso. Probá de nuevo en unos minutos.' }
+});
+
+app.post('/api/login', loginLimiter, (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Faltan usuario o clave' });
 
@@ -382,6 +409,15 @@ io.on('connection', (socket) => {
       });
     }
   });
+});
+
+// Maneja errores sin exponer rutas internas del servidor ni stack traces al cliente.
+app.use((err, req, res, next) => {
+  if (err && err.message === 'Origen no permitido') {
+    return res.status(403).json({ error: 'Origen no permitido' });
+  }
+  console.error(err);
+  res.status(500).json({ error: 'Error interno del servidor' });
 });
 
 server.listen(PORT, () => {
