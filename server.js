@@ -116,7 +116,9 @@ const app = express();
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(UPLOADS_DIR));
+// Nota: /uploads YA NO se sirve como carpeta pública. Cada archivo se sirve a través
+// de /api/uploads/:filename, que verifica que quien lo pide tenga permiso de verlo
+// (ver más abajo, junto al resto de endpoints de archivos).
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: allowedOrigins } });
@@ -181,11 +183,39 @@ app.post('/api/upload', authMiddleware, (req, res) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' });
     res.json({
-      file_url: `/uploads/${req.file.filename}`,
+      file_url: `/api/uploads/${req.file.filename}`,
       file_name: req.file.originalname,
       file_mime: req.file.mimetype
     });
   });
+});
+
+// Sirve un archivo adjunto SOLO si quien lo pide tiene permiso de verlo:
+// el admin puede ver cualquiera; un cliente solo los de su propia conversación.
+app.get('/api/uploads/:filename', authMiddleware, (req, res) => {
+  const { filename } = req.params;
+  if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/.test(filename)) {
+    return res.status(400).json({ error: 'Nombre de archivo inválido' });
+  }
+
+  const message = db.prepare(`
+    SELECT conversation_user_id, file_mime FROM messages WHERE file_url = ?
+  `).get(`/api/uploads/${filename}`);
+  if (!message) return res.status(404).json({ error: 'Archivo no encontrado' });
+
+  if (req.user.role === 'client' && message.conversation_user_id !== req.user.id) {
+    return res.status(403).json({ error: 'No tenés permiso para ver este archivo' });
+  }
+
+  const fullPath = path.join(UPLOADS_DIR, filename);
+  const resolved = path.resolve(fullPath);
+  if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) {
+    return res.status(400).json({ error: 'Ruta inválida' });
+  }
+  if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'Archivo no encontrado' });
+
+  res.type(message.file_mime || 'application/octet-stream');
+  res.sendFile(resolved);
 });
 
 // ---------- notificaciones push: clave pública y suscripción ----------

@@ -7,7 +7,7 @@ Un análisis hecho el 20/09/2026, para ir tachando ítems día a día.
 
 - [x] **Límite de intentos de login** — máx. 10 intentos cada 15 min por IP (hecho 20/09)
 - [x] **CORS restringido** al dominio propio de la app, en vez de abierto a cualquier sitio (hecho 20/09)
-- [ ] **Control de acceso a los archivos subidos** — hoy cualquiera con el link puede verlos, sin estar logueado
+- [x] **Control de acceso a los archivos subidos** — hecho 22/09: solo el cliente dueño de la conversación o un admin pueden verlos, con token
 - [ ] **Revocar sesiones activas** — hoy no hay forma de "desloguear a la fuerza" a alguien desde el panel
 - [ ] **2FA para la cuenta admin** — es la cuenta más golosa para atacar, maneja todo
 - [ ] **Registro de auditoría** — quién creó/borró usuarios, quién cambió qué clave y cuándo

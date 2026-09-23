@@ -349,12 +349,36 @@ function renderTemplates(history){
   }
 }
 
+let _attCounter = 0;
+
 function bubbleAttachmentHtml(m){
   if(!m.file_url) return '';
+  const uid = 'att' + (_attCounter++);
   if((m.file_mime||'').startsWith('image/')){
-    return `<a href="${m.file_url}" target="_blank"><img class="att" src="${m.file_url}" alt="${escapeHtml(m.file_name||'imagen')}"></a>`;
+    return `<a class="att-link" href="#" data-file="${m.file_url}"><img class="att" id="${uid}" alt="${escapeHtml(m.file_name||'imagen')}"></a>`;
   }
-  return `<a class="filechip" href="${m.file_url}" target="_blank">📄 ${escapeHtml(m.file_name||'archivo')}</a>`;
+  return `<a class="filechip" href="#" data-file="${m.file_url}" data-name="${escapeHtml(m.file_name||'archivo')}">📄 ${escapeHtml(m.file_name||'archivo')}</a>`;
+}
+
+// Los archivos ya no son públicos: hay que pedirlos con el token y recién ahí mostrarlos.
+async function hydrateAttachments(container){
+  const links = container.querySelectorAll('[data-file]:not([data-loaded])');
+  for(const link of links){
+    link.dataset.loaded = '1';
+    const fileUrl = link.dataset.file;
+    try{
+      const res = await fetch(fileUrl, { headers: authHeaders() });
+      if(!res.ok) throw new Error('no autorizado');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      link.href = blobUrl;
+      link.target = '_blank';
+      const img = link.querySelector('img');
+      if(img) img.src = blobUrl;
+    }catch{
+      link.textContent = '⚠️ No se pudo cargar el archivo';
+    }
+  }
 }
 
 function appendMessage(m, scroll = true){
@@ -367,6 +391,7 @@ function appendMessage(m, scroll = true){
   const textHtml = m.text ? escapeHtml(m.text) : '';
   div.innerHTML = bubbleAttachmentHtml(m) + textHtml + '<span class="time">' + fmtTime(m.created_at) + '</span>';
   wrap.appendChild(div);
+  hydrateAttachments(div);
   if(scroll) wrap.scrollTop = wrap.scrollHeight;
 }
 
