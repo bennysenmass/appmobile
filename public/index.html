@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--ink:#12211E;--ink-soft:#3C4A47;--paper:#F2F4F1;--card:#FFFFFF;--line:#D7DCD3;--money:#1F7A5C;--money-soft:#E4F1EB;--warn:#C4562B;}
+  :root{--ink:#12211E;--ink-soft:#3C4A47;--paper:#F2F4F1;--card:#FFFFFF;--line:#D7DCD3;--money:#1F7A5C;--money-soft:#E4F1EB;--warn:#C4562B;--accent-primary:var(--money);}
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;height:100vh;display:flex;align-items:center;justify-content:center;}
   .app{width:100%;max-width:420px;height:100vh;max-height:720px;background:var(--card);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 32px rgba(18,33,30,.08);}
@@ -66,6 +66,27 @@
   .quickbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 0;background:var(--paper);}
   .quickchip{border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;font-size:12px;font-weight:500;padding:7px 12px;border-radius:999px;cursor:pointer;white-space:nowrap;}
   .quickchip:active{background:var(--money-soft);border-color:var(--money);}
+
+  /* ---- avisos propios (toast / modal), reemplazan alert/confirm/prompt ---- */
+  .toast-host{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;}
+  .toast{background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:12.5px;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:88vw;text-align:center;opacity:0;transform:translateY(8px);transition:all .2s ease;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.toast-error{background:var(--warn);}
+  .toast.toast-success{background:var(--money);}
+
+  .app-modal-overlay{position:fixed;inset:0;background:rgba(18,33,30,.45);display:flex;align-items:center;justify-content:center;z-index:250;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+  .app-modal-overlay.show{opacity:1;pointer-events:auto;}
+  .app-modal-card{background:var(--card);border-radius:16px;width:100%;max-width:360px;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.25);transform:translateY(8px);transition:transform .2s ease;}
+  .app-modal-overlay.show .app-modal-card{transform:translateY(0);}
+  .app-modal-title{font-size:15px;font-weight:600;margin-bottom:8px;}
+  .app-modal-body p{font-size:13px;color:var(--ink-soft);margin:0 0 10px;line-height:1.4;}
+  .app-modal-input{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:13px;background:var(--paper);box-sizing:border-box;margin-bottom:4px;}
+  .app-modal-err{font-size:11.5px;color:var(--warn);min-height:14px;margin:2px 0 0;}
+  .app-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+  .app-modal-btn{font-family:inherit;font-size:13px;font-weight:600;padding:9px 14px;border-radius:9px;border:none;cursor:pointer;}
+  .app-modal-btn.secondary{background:var(--paper);color:var(--ink-soft);border:1px solid var(--line);}
+  .app-modal-btn.primary{background:var(--accent-primary);color:#fff;}
+  .app-modal-btn.danger{background:var(--warn);color:#fff;}
 </style>
 </head>
 <body>
@@ -236,7 +257,7 @@ document.getElementById('clipBtn').addEventListener('click', ()=>{
 document.getElementById('fileInput').addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(!file) return;
-  if(file.size > 8 * 1024 * 1024){ alert('El archivo no puede superar 8 MB.'); e.target.value=''; return; }
+  if(file.size > 8 * 1024 * 1024){ showToast('El archivo no puede superar 8 MB.', 'error'); e.target.value=''; return; }
   selectedFile = file;
   const prev = document.getElementById('filePreview');
   prev.style.display = 'flex';
@@ -277,7 +298,7 @@ async function sendMsg(){
       attachment = await uploadSelectedFile();
     }
   }catch(err){
-    alert(err.message);
+    showToast(err.message, 'error');
     sendBtn.disabled = false; sendBtn.textContent = '➤';
     return;
   }

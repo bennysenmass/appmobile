@@ -11,6 +11,7 @@ const multer = require('multer');
 const { randomUUID } = require('crypto');
 const webpush = require('web-push');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const db = require('./db');
 
@@ -113,6 +114,33 @@ const corsOptions = {
 };
 
 const app = express();
+
+// ---------- cabeceras de seguridad estándar ----------
+// Nota: script-src y style-src permiten 'unsafe-inline' porque hoy cada página es
+// un único archivo HTML con el código embebido adentro. El resto de las reglas
+// (qué dominios pueden cargar fuentes, conectarse, etc.) sí queda restringido.
+// Migrar los <script> a archivos aparte para sacar el 'unsafe-inline' de scripts
+// queda anotado en el ROADMAP como el siguiente paso de este mismo tema.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      mediaSrc: ["'self'"],
+      connectSrc: ["'self'"],
+      manifestSrc: ["'self'"],
+      workerSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));

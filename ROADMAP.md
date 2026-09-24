@@ -11,7 +11,7 @@ Un análisis hecho el 20/09/2026, para ir tachando ítems día a día.
 - [ ] **Revocar sesiones activas** — hoy no hay forma de "desloguear a la fuerza" a alguien desde el panel
 - [ ] **2FA para la cuenta admin** — es la cuenta más golosa para atacar, maneja todo
 - [ ] **Registro de auditoría** — quién creó/borró usuarios, quién cambió qué clave y cuándo
-- [ ] **Security headers** (ej. con la librería `helmet`) — protecciones estándar contra clickjacking, sniffing, etc.
+- [x] **Security headers** (con `helmet`) — hecho 23/09. Pendiente afinar más adelante: mover los `<script>` embebidos de cada página a archivos externos para poder sacar el `'unsafe-inline'` del CSP y dejarlo con la protección completa contra XSS
 
 ## 🟡 Escalabilidad (importa si crece el uso)
 
@@ -22,6 +22,25 @@ Un análisis hecho el 20/09/2026, para ir tachando ítems día a día.
 - [ ] **Límite de velocidad de envío de mensajes** — evitar que alguien sature el servidor mandando miles de mensajes por segundo
 - [ ] **Monitoreo y alertas** — enterarse si el servidor se cae, antes que un cliente se queje
 - [ ] **Tests automáticos** — para no depender de probar todo a mano en cada cambio
+
+## 🎨 UX / Diseño (análisis del 22/09)
+
+**Rápidas, se notan mucho:**
+- [x] **Reemplazar los `alert()` / `confirm()` / `prompt()` del navegador** por avisos propios (toast + modales) — hecho 23/09
+- [ ] **Aviso propio antes de pedir permiso de notificaciones** — hoy salta el pedido del navegador sin contexto, mucha gente lo rechaza por reflejo
+- [ ] **Buscador en la lista de conversaciones del admin** + mostrar hace cuánto fue el último mensaje
+- [ ] **Colores de avatar distintos por cliente** en la lista del admin (hoy todos son el mismo verde, cuesta distinguir)
+- [ ] **Cuadro de texto del cliente multilínea** (el del admin ya lo es, el del cliente no)
+
+**Más impacto, más trabajo:**
+- [ ] Tilde de mensaje leído/entregado
+- [ ] Indicador de "está escribiendo..."
+- [ ] Modo oscuro
+- [ ] Visor ampliado de fotos (en vez de abrir en pestaña nueva)
+
+**Pulido final:**
+- [ ] Reemplazar emojis (📎📄➤) por íconos SVG reales
+- [ ] Animación suave al enviar/recibir mensajes
 
 ## Notas
 
